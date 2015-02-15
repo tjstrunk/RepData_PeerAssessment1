@@ -1,25 +1,89 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "PA1_template"
+author: "tjstrunk"
+date: "Sunday, February 15, 2015"
+output: html_document
 ---
 
+First we will load and format the data.
 
-## Loading and preprocessing the data
+```{r}
+data <- read.csv("activity.csv")
+data$date <- as.Date(data$date)
+```
 
+Now we give a histogram of the total number of steps taken in a single day (ignoring missing values) and report the mean and median number of steps in a single day
 
+```{r}
+day_sums <- aggregate(data$steps, 
+                list(data = data$date), sum, na.rm = TRUE)
+names(day_sums)[names(day_sums) == "x"] <- "steps"
+names(day_sums)[names(day_sums) == "data"] <- "date"
+hist(day_sums$steps, xlab = "Steps", main = "Histogram of steps taken per day")
+mean(day_sums$steps)
+median(day_sums$steps)
+```
 
-## What is mean total number of steps taken per day?
+We might also wonder how many steps are usually taken in a given interval of time, and here we give a plot of the average number of steps taken during a given interval followed by the interval during which participants are taking the most steps (i.e. being most active).
 
+```{r}
+num_days <- length(unique(data$date))
+  intval_steps <- aggregate(data$steps, 
+                    list(interval = data$interval), sum, na.rm = TRUE)
+  names(intval_steps)[names(intval_steps) == "x"] <- "steps"
+  intval_steps$steps <- intval_steps$steps / num_days
+  plot(intval_steps$interval, intval_steps$steps, type = "l", xlab = "Interval", ylab = "Steps Taken")
+  intval_steps$interval[intval_steps$steps == max(intval_steps$steps)]
+```
 
+Now we present the number of missing data values as well as fill in those missing values by assigning an interval with an "NA" value to the mean number of steps taken during that interval over all days. We then give a histogram of the number of steps taken per day given that the missing values are filled with these means and the mean and median of that new data set as well.
 
-## What is the average daily activity pattern?
+```{r}
+  sum(is.na(data$steps))
+  data$impute <- c(rep(intval_steps$interval, times = 61))
+  data$steps[is.na(data$steps)] <- data$impute[is.na(data$steps)]
+  hist(day_sums$steps, xlab = "Steps", main = "Histogram of steps taken per day")
+  mean(day_sums$steps)
+  median(day_sums$steps)
+```
 
+Notice that the mean, median, and histogram remain relatively unchanged.
 
+Here we use our filled-in data frame to compare the activity of participants on weekdays versus weekends by plotting the average number of steps per interval on a weekend and the average number of steps per interval on a weekday.
 
-## Imputing missing values
+```{r}
+  day_sums <- within(day_sums, {
+  day_kind = ifelse(test = weekdays(date) == "Saturday" |
+                      weekdays(date) == "Sunday", 
+                    yes = "weekend", no = "weekday")
+  })
+  num_weekends <- 0
+  for (i in 1:nrow(day_sums)) {
+   if(day_sums[i, "day_kind"] == "weekend") {
+     num_weekends <- num_weekends + 1
+   }
+  }
+num_weekdays <- nrow(day_sums) - num_weekends
+  data <- within(data, {
+  day_kind = ifelse(test = weekdays(date) == "Saturday" |
+            weekdays(date) == "Sunday", 
+            yes = "weekend", no = "weekday")
+  })
+  data$day_kind <- as.factor(data$day_kind)
+  weekendata <- subset(data, day_kind == "weekend")
+  weekday_data <- subset(data, day_kind == "weekday")
+  intval_weekday <- aggregate(weekday_data$steps, 
+                    list(interval = weekday_data$interval), sum, 
+                    na.rm = TRUE)
+  names(intval_weekday)[names(intval_weekday) == "x"] <- "steps"
+  intval_weekday$steps <- intval_weekday$steps / num_weekdays
+  intval_weekend <- aggregate(weekendata$steps, 
+                              list(interval = weekendata$interval), sum, 
+                              na.rm = TRUE)
+  names(intval_weekend)[names(intval_weekend) == "x"] <- "steps"
+  intval_weekend$steps <- intval_weekend$steps / num_weekends
+  par(mfrow = c(2, 1))
+  plot(intval_weekday$interval, intval_weekday$steps, type = "l", xlab = "Interval", ylab = "Steps Taken", main = "Steps Taken on Weekdays")
+  plot(intval_weekend$interval, intval_weekend$steps, type = "l", xlab = "Interval", ylab = "Steps Taken", main = "Steps Taken on Weekends")
 
-
-
-## Are there differences in activity patterns between weekdays and weekends?
+```
